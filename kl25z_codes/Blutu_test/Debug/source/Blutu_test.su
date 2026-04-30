@@ -1,0 +1,5 @@
+../source/Blutu_test.c:8:5:main	8	static
+../source/Blutu_test.c:28:6:UART1_Init	8	static
+../source/Blutu_test.c:54:6:UART1_Write	16	static
+../source/Blutu_test.c:60:6:UART1_WriteString	16	static
+../source/Blutu_test.c:64:6:delay_ms	24	static
