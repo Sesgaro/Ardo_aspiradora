@@ -1,0 +1,47 @@
+# 1. Configuración del cerebro (ESP32-S3 requiere el framework esp-idf para audio avanzado)
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+# 2. El bus de audio (Ajusta estos GPIOs según cómo hayas soldado tus cables)
+i2s_audio:
+  - id: i2s_bus
+    i2s_lrclk_pin: GPIO4 # Word Select (WS / LRC)
+    i2s_bclk_pin: GPIO5  # Bit Clock (BCLK / SCK)
+
+# 3. El Oído de Ardo (Micrófono I2S)
+microphone:
+  - platform: i2s_audio
+    id: ardo_mic
+    i2s_audio_id: i2s_bus
+    i2s_din_pin: GPIO6   # Data In (SD)
+    adc_type: external
+    pdm: false
+
+# 4. La Voz de Ardo (Amplificador I2S)
+speaker:
+  - platform: i2s_audio
+    id: ardo_speaker
+    i2s_audio_id: i2s_bus
+    i2s_dout_pin: GPIO7  # Data Out (DIN)
+    dac_type: external
+
+# 5. El motor de microWakeWord que entrenaste
+micro_wake_word:
+  models:
+    # Aquí pones el nombre de tu archivo .tflite que sacamos del entorno de Jupyter
+    - model: ardo_wake_word.tflite 
+
+# 6. La integración mágica con Home Assistant
+voice_assistant:
+  id: ardo_assistant
+  microphone: ardo_mic
+  speaker: ardo_speaker
+  use_wake_word: true
+  
+  # Opcional: Feedback visual o sonoro cuando despierte
+  on_listening:
+    - logger.log: "Ardo: Te escucho, dime..."
+  on_tts_start:
+    - logger.log: "Ardo: Procesando respuesta..."
