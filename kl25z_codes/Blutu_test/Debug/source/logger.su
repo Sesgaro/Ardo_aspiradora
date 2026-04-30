@@ -1,0 +1,4 @@
+../source/logger.c:26:6:log_serial_data	8	static
+../source/logger.c:71:13:display_menu	8	static
+../source/logger.c:84:13:transmit_byte	16	static
+../source/logger.c:95:13:transmit_string	16	static

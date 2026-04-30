@@ -1,67 +1,96 @@
-#include <MKL25Z4.h>
 
-void UART1_Init(void);
-void UART1_Write(char data);
-void UART1_WriteString(char* str);
-void delay_ms(uint32_t n);
+#include "MKL25Z4.h"
+#include <stdint.h>
+#include "BSPInit.h"
+#include "at_manager.h"
+#include "isr.h"
 
-int main(void) {
-    UART1_Init();
+/* ---- Período de AT+INQ (cada N ciclos de AT+RSSI) ---- */
+#define INQ_EVERY_N_PINGS   3U   /* INQ cada 3 × 10 s = 30 s */
 
-    // Configurar PTE21 como salida (LED de Diagnóstico/Radar)
-    SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK;
-    PORTE->PCR[21] = PORT_PCR_MUX(1);
-    PTE->PDDR |= (1 << 21);
+/* ---- LEDs (lógica inversa: 0 = encendido) ---- */
+#define LED_RED_ON()    (GPIOB->PCOR = (1U << 18))
+#define LED_RED_OFF()   (GPIOB->PSOR = (1U << 18))
+#define LED_GREEN_ON()  (GPIOB->PCOR = (1U << 19))
+#define LED_GREEN_OFF() (GPIOB->PSOR = (1U << 19))
+#define LED_BLUE_ON()   (GPIOD->PCOR = (1U <<  1))
+#define LED_BLUE_OFF()  (GPIOD->PSOR = (1U <<  1))
 
-    while (1) {
-        // Enviar comando a la ESP32
-        UART1_WriteString("AT+RSSI?\r\n");
+static void leds_off(void)
+{
+    LED_RED_OFF(); LED_GREEN_OFF(); LED_BLUE_OFF();
+}
 
-        // Parpadeo visual en la KL25Z
-        PTE->PTOR = (1 << 21);
+/* Refleja el RSSI en el color del LED */
+static void rssi_to_led(int16_t rssi)
+{
+    leds_off();
+    if      (rssi > -60)  { LED_GREEN_ON(); }   /* Señal fuerte */
+    else if (rssi > -80)  { LED_BLUE_ON();  }   /* Señal media  */
+    else                  { LED_RED_ON();   }   /* Señal débil  */
+}
 
-        // Delay de aproximadamente 1.5 segundos
-        delay_ms(200);
+/* ---- Variables de aplicación ---- */
+static uint8_t ping_count = 0;   /* Cuenta pings para disparar INQ */
+
+int main(void)
+{
+    bsp_init();          /* Reloj, GPIO, SysTick, UART0       */
+    at_manager_init();   /* Verificación inicial con "AT"     */
+
+    for (;;)
+    {
+        /* Motor de la comunicación AT (consume ISR + timeout) */
+        at_manager_tick();
+
+        const at_result_t *r = at_get_result();
+
+        /* ---- Procesar respuesta completa ---- */
+        if (r->state == AT_DONE)
+        {
+            if (r->rssi != -100)
+            {
+                /* Respuesta a AT+RSSI: reflejar señal en LED */
+                rssi_to_led(r->rssi);
+            }
+
+            if (r->inq_done)
+            {
+                /* Respuesta a AT+INQ: escaneo BLE completado en la ESP32 */
+                leds_off();
+                LED_GREEN_ON();
+                LED_BLUE_ON();   /* Cian = INQ completado */
+            }
+
+            at_clear();
+        }
+
+        /* ---- Timeout: LED rojo+azul (magenta) ---- */
+        if (r->state == AT_TIMEOUT)
+        {
+            leds_off();
+            LED_RED_ON();
+            LED_BLUE_ON();   /* Magenta = sin respuesta */
+            at_clear();
+        }
+
+        /* ---- Tarea de 500 ms: parpadeo watchdog + lanzar INQ ---- */
+        if (flag_500msec)
+        {
+            flag_500msec = 0U;
+
+            /* El at_manager maneja el ping automático en flag_1sec.
+             * Aquí solo verificamos si toca lanzar un AT+INQ. */
+            if (r->state == AT_IDLE)
+            {
+                if (++ping_count >= INQ_EVERY_N_PINGS * 20U) /* ×20 porque flag_500msec es cada 0.5 s × 20 = 10 s × N */
+                {
+                    ping_count = 0;
+                    at_send_command("AT+INQ");
+                }
+            }
+        }
     }
-}
 
-void UART1_Init(void) {
-    // 1. Habilitar relojes para UART1 y Puerto E
-    SIM->SCGC4 |= SIM_SCGC4_UART1_MASK;
-    SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK;
-
-    // 2. Configurar pines PTE0 (TX) y PTE1 (RX) como ALT 3 (UART1)
-    // Limpiamos antes para evitar conflictos
-    PORTE->PCR[0] = 0;
-    PORTE->PCR[1] = 0;
-    PORTE->PCR[0] = PORT_PCR_MUX(3);
-    PORTE->PCR[1] = PORT_PCR_MUX(3);
-
-    // 3. Desactivar UART para configuración
-    UART1->C2 &= ~(UART_C2_TE_MASK | UART_C2_RE_MASK);
-
-    // 4. Configurar Baud Rate a 9600
-    // Bus Clock = 41.94MHz / 2 = 20,971,520 Hz
-    // SBR = 20,971,520 / (16 * 9600) = 136.53 -> Usamos 137 (0x89)
-    UART1->BDH = 0x00;
-    UART1->BDL = 0xA9;
-
-    // 5. Activar Transmisor y Receptor
-    UART1->C1 = 0x00;
-    UART1->C2 |= (UART_C2_TE_MASK | UART_C2_RE_MASK);
-}
-
-void UART1_Write(char data) {
-    // Esperar a que el buffer esté vacío
-    while (!(UART1->S1 & UART_S1_TDRE_MASK));
-    UART1->D = data;
-}
-
-void UART1_WriteString(char* str) {
-    while(*str) UART1_Write(*str++);
-}
-
-void delay_ms(uint32_t n) {
-    // Ajustado para 41.94 MHz
-    for(volatile int i = 0; i < n * 3500; i++);
+    return 0;
 }

@@ -1,0 +1,2 @@
+../source/isr.c:31:6:SysTick_Handler	8	static
+../source/isr.c:69:6:UART0_IRQHandler	8	static
