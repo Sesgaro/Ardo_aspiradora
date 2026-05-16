@@ -34,7 +34,7 @@ def clean_text_for_tts(text: str) -> str:
 class ArdoBrain:
     def __init__(self, memory: ArdoMemory):
         self.memory = memory
-        self.model = 'qwen3.5:9b'
+        self.model = 'qwen2.5:7b'
         
         self.system_prompt = {
             "role": "system",

@@ -2,14 +2,6 @@
     "5635468767": [
         {
             "role": "user",
-            "content": "En Zapopan"
-        },
-        {
-            "role": "assistant",
-            "content": "Según las últimas informaciones encontradas en línea, la situación de los crímenes en Zapopan ha mejorado gracias a esfuerzos de seguridad adicionales. Sin embargo, como las condiciones pueden cambiar rápidamente, te recomendamos consultar fuentes locales confiables para obtener información actualizada y detallada.\n\n¿Necesitas ayuda para acceder a estas fuentes o tienes alguna otra pregunta?"
-        },
-        {
-            "role": "user",
             "content": "Soy puto, soy gay, soy gay"
         },
         {
@@ -39,6 +31,14 @@
         {
             "role": "assistant",
             "content": "Entiendo que te refieres a Jeffrey Epstein. Jeffrey Epstein fue un empresario estadounidense acusado de varias cargas relacionadas con la explotación sexual de menores y adultos jóvenes. Aquí tienes una breve descripción de su situación:\n\n- **Nombre completo**: Jeffrey Adam Epstein.\n- **Nacimiento**: 21 de julio de 1953, en New York City, EE.UU.\n- **Muerte**: Se suicidó el 10 de agosto de 2019 mientras estaba en custodia federal bajo arresto domiciliario en una prisión de Estados Unidos.\n\nEpstein fue acusado y condenado por múltiples cargos relacionados con la explotación sexual de menores. La investigación sobre su caso ha sido extensa y ha involucrado a numerosas personas y organizaciones, generando mucha controversia y debate en los medios de comunicación y entre el público.\n\n¿Necesitas información más detallada o tienes alguna otra pregunta relacionada?"
+        },
+        {
+            "role": "user",
+            "content": "Hola?"
+        },
+        {
+            "role": "assistant",
+            "content": "Sistema operativo. Historial revisado. Contexto entendido. Esperando nueva solicitud."
         }
     ],
     "terminal": [
@@ -49,6 +49,56 @@
         {
             "role": "assistant",
             "content": "Bienvenido. ARDO está operativo. ¿Cuál es la solicitud técnica actual?"
+        },
+        {
+            "role": "user",
+            "content": "Hola"
+        },
+        {
+            "role": "assistant",
+            "content": "Reconocimiento de llamada. Sistema listo para procesamiento. ¿Solicitud técnica o acción requerida?"
+        }
+    ],
+    "hardware_usb": [
+        {
+            "role": "user",
+            "content": "¿Estás ahí? ¿Qué onda?"
+        },
+        {
+            "role": "assistant",
+            "content": "Sistema en línea y listo para ayudar. ¿Cómo puedo asistirle hoy?"
+        },
+        {
+            "role": "user",
+            "content": "¿Estás ahí? ¿Qué onda?"
+        },
+        {
+            "role": "assistant",
+            "content": "Sistema en línea y disponible. ¿Necesita información o ayuda con algo específico?"
+        },
+        {
+            "role": "user",
+            "content": "¿Estás ahí?"
+        },
+        {
+            "role": "assistant",
+            "content": "Sistema en línea y listo para ayudar. ¿Puedo asistir con algo hoy?"
+        },
+        {
+            "role": "user",
+            "content": "¿Estás ahí?"
+        },
+        {
+            "role": "assistant",
+            "content": "Sistema en línea. ¿Necesita información o ayuda con algo específico?"
+        },
+        {
+            "role": "user",
+            "content": "¿Estás ahí?"
+        },
+        {
+            "role": "assistant",
+            "content": "Sistema en línea y listo para ayudar. ¿Puedo asistir con algo hoy?"
         }
     ]
 }

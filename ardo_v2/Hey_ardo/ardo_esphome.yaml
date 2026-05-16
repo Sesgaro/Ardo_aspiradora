@@ -1,0 +1,68 @@
+esphome:
+  name: ardo-tcp
+  friendly_name: Ardo_tcp
+  includes:
+    - raw_wifi_sender_test1.h
+  on_boot:
+    priority: 800
+    then:
+      - light.turn_on:
+          id: led_status
+          brightness: 100%
+          red: 0%
+          green: 0%
+          blue: 100%
+      - delay: 500ms
+      - lambda: |-
+          start_ardo_engine();
+      - delay: 500ms
+      - light.turn_on:
+          id: led_status
+          brightness: 100%
+          red: 0%
+          green: 100%
+          blue: 0%
+      - delay: 500ms
+      - light.turn_off:
+          id: led_status
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHMODE_QIO: "y"
+      CONFIG_ESPTOOLPY_FLASHSIZE_16MB: "y"
+      CONFIG_SPIRAM: "y"
+      CONFIG_SPIRAM_MODE_OCT: "y"
+      CONFIG_SPIRAM_SPEED_80M: "y"
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
+      CONFIG_SPIRAM_RODATA: "y"
+
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+
+wifi:
+  ap:
+    ssid: "Ardo_Net"
+    channel: 6
+  reboot_timeout: 0s
+  power_save_mode: NONE
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: led_status
+    pin: GPIO48
+    num_leds: 1
+    rgb_order: GRB
+    chipset: WS2812
+    name: "Ardo LED Indicator"
+
+# Mandar el paquete "ALIVE" para diagnóstico
+interval:
+  - interval: 5s
+    then:
+      - lambda: |-
+          send_heartbeat();
+          ESP_LOGD("custom", "Heartbeat enviado");
