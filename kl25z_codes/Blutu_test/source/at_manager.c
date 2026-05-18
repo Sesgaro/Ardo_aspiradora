@@ -3,14 +3,6 @@
  * ------------
  * Máquina de estados para comunicación AT entre la KL25Z y la
  * ESP32 SuperMini (firmware con BLE + UART a 9600 bps).
- *
- * Protocolo:
- *   KL25Z  →  ESP32 :  "AT+RSSI\r\n"
- *   ESP32  →  KL25Z :  "OK+RSSI:-65\r\n"
- *
- * La recepción es dirigida por interrupción (UART0_IRQHandler escribe
- * en user_input_key). Este módulo la consume en at_manager_tick().
- * La transmisión usa polling (espera TDRE antes de cada byte).
  */
 
 #include "MKL25Z4.h"
@@ -32,7 +24,7 @@ static uint8_t      rx_idx;           /* índice en result.response[]    */
 static uint8_t      ping_counter;     /* contador de segundos para ping */
 
 /* ---- Tiempo simple (incrementado desde SysTick_Handler) ---- */
-extern volatile uint32_t g_ms_ticks;  /* Definido aquí, declarado en isr.h */
+extern volatile uint32_t g_ms_ticks;
 
 /* ---- LEDs (lógica inversa: 0 = encendido) ---- */
 #define LED_RED_ON()    (GPIOB->PCOR = (1U << 18))
@@ -61,18 +53,19 @@ static void led_status(at_state_t state)
 }
 
 /* ------------------------------------------------------------------
- * uart0_send_byte() / uart0_send_string()
+ * uart1_send_byte() / uart1_send_string() // <-- CORRECCIÓN: Ahora usan UART1
  * Transmisión por polling: espera que el buffer de TX esté libre.
  * ------------------------------------------------------------------ */
-static void uart0_send_byte(char c)
+static void uart1_send_byte(char c)
 {
-    while (!(UART0->S1 & UART_S1_TDRE_MASK)) { }
-    UART0->D = (uint8_t)c;
+    // <-- CORRECCIÓN: Registros apuntados al UART1
+    while (!(UART1->S1 & UART_S1_TDRE_MASK)) { }
+    UART1->D = (uint8_t)c;
 }
 
-static void uart0_send_string(const char *s)
+static void uart1_send_string(const char *s)
 {
-    while (*s) uart0_send_byte(*s++);
+    while (*s) uart1_send_byte(*s++);
 }
 
 /* ------------------------------------------------------------------
@@ -83,22 +76,17 @@ static void parse_response(void)
 {
     const char *resp = result.response;
 
-    /* OK+RSSI:<número> */
     if (strncmp(resp, "OK+RSSI:", 8) == 0)
     {
         result.rssi = (int16_t)atoi(resp + 8);
         return;
     }
 
-    /* OK+INQ_DONE */
     if (strncmp(resp, "OK+INQ_DONE", 11) == 0)
     {
         result.inq_done = 1;
         return;
     }
-
-    /* OK (respuesta genérica de AT) */
-    /* No requiere acción adicional */
 }
 
 /* ------------------------------------------------------------------
@@ -114,7 +102,6 @@ void at_manager_init(void)
     leds_off();
     led_status(AT_IDLE);
 
-    /* Verificar conexión con la ESP32 */
     at_send_command("AT");
 }
 
@@ -123,7 +110,7 @@ void at_manager_init(void)
  * ------------------------------------------------------------------ */
 void at_send_command(const char *cmd)
 {
-    if (result.state == AT_WAITING) return;  /* Ya hay un comando en vuelo */
+    if (result.state == AT_WAITING) return;
 
     memset(result.response, 0, AT_RESP_MAX_LEN);
     result.rssi     = -100;
@@ -133,19 +120,18 @@ void at_send_command(const char *cmd)
 
     send_timestamp = g_ms_ticks;
 
-    uart0_send_string(cmd);
-    uart0_send_string("\r\n");
+    // <-- CORRECCIÓN: Enviando los comandos por el UART1
+    uart1_send_string(cmd);
+    uart1_send_string("\r\n");
 
     led_status(AT_WAITING);
 }
 
 /* ------------------------------------------------------------------
  * at_manager_tick()
- * Llamar en cada iteración del bucle principal (o cada 10 ms).
  * ------------------------------------------------------------------ */
 void at_manager_tick(void)
 {
-    /* --- Consumir byte de la ISR --- */
     if (user_input_key != 0)
     {
         char c = user_input_key;
@@ -153,7 +139,6 @@ void at_manager_tick(void)
 
         if (result.state == AT_WAITING)
         {
-            /* Acumular hasta \n o buffer lleno; ignorar \r */
             if (c != '\r' && c != '\n')
             {
                 if (rx_idx < AT_RESP_MAX_LEN - 1)
@@ -164,7 +149,6 @@ void at_manager_tick(void)
             }
             else if (c == '\n' && rx_idx > 0)
             {
-                /* Línea completa recibida */
                 parse_response();
                 result.state = AT_DONE;
                 led_status(AT_DONE);
@@ -172,7 +156,6 @@ void at_manager_tick(void)
         }
     }
 
-    /* --- Timeout --- */
     if (result.state == AT_WAITING)
     {
         if ((g_ms_ticks - send_timestamp) >= AT_TIMEOUT_MS)
@@ -182,7 +165,6 @@ void at_manager_tick(void)
         }
     }
 
-    /* --- Ping automático cada AT_PING_SEC segundos --- */
     if (flag_1sec)
     {
         flag_1sec = 0U;

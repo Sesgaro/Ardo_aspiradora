@@ -11,7 +11,8 @@ C_SRCS += \
 ../source/isr.c \
 ../source/logger.c \
 ../source/mtb.c \
-../source/semihost_hardfault.c 
+../source/semihost_hardfault.c \
+../source/ultrasonico.c 
 
 C_DEPS += \
 ./source/BSPInit.d \
@@ -21,7 +22,8 @@ C_DEPS += \
 ./source/isr.d \
 ./source/logger.d \
 ./source/mtb.d \
-./source/semihost_hardfault.d 
+./source/semihost_hardfault.d \
+./source/ultrasonico.d 
 
 OBJS += \
 ./source/BSPInit.o \
@@ -31,7 +33,8 @@ OBJS += \
 ./source/isr.o \
 ./source/logger.o \
 ./source/mtb.o \
-./source/semihost_hardfault.o 
+./source/semihost_hardfault.o \
+./source/ultrasonico.o 
 
 
 # Each subdirectory must supply rules for building sources it contributes
@@ -46,7 +49,7 @@ source/%.o: ../source/%.c source/subdir.mk
 clean: clean-source
 
 clean-source:
-	-$(RM) ./source/BSPInit.d ./source/BSPInit.o ./source/Blutu_test.d ./source/Blutu_test.o ./source/LEDBlink.d ./source/LEDBlink.o ./source/at_manager.d ./source/at_manager.o ./source/isr.d ./source/isr.o ./source/logger.d ./source/logger.o ./source/mtb.d ./source/mtb.o ./source/semihost_hardfault.d ./source/semihost_hardfault.o
+	-$(RM) ./source/BSPInit.d ./source/BSPInit.o ./source/Blutu_test.d ./source/Blutu_test.o ./source/LEDBlink.d ./source/LEDBlink.o ./source/at_manager.d ./source/at_manager.o ./source/isr.d ./source/isr.o ./source/logger.d ./source/logger.o ./source/mtb.d ./source/mtb.o ./source/semihost_hardfault.d ./source/semihost_hardfault.o ./source/ultrasonico.d ./source/ultrasonico.o
 
 .PHONY: clean-source
 

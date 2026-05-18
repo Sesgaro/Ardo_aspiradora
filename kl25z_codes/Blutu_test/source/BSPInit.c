@@ -1,122 +1,98 @@
-/*
- * BSPInit.c - Board Support Package para KL25Z
- * UART0 configurado a 9600 baudios, 8-N-1
- * Basado en: learningmicro.wordpress.com/serial-communication-interface-using-uart
- *
- * Clock   : FLL @ 48 MHz (MCGFLLCLK)
- * UART    : UART0 | Pines PTA1 (RX) y PTA2 (TX)
- * Baud    : 9600  | OSR=16, BDH=0x01, BDL=0x38
- * Config  : 8-N-1 (8 bits de datos, sin paridad, 1 bit de stop)
- */
-
 #include "MKL25Z4.h"
 #include <stdint.h>
+#include "BSPInit.h"
 
-/* ---- Constantes ---- */
-#define SYSTEM_CLOCK_FREQ     48000000UL   /* 48 MHz                  */
-#define SYSTICK_INTERVAL_MS   1            /* Periodo de tick: 1 ms   */
-#define SYSTICK_FREQ_HZ       (SYSTICK_INTERVAL_MS * 1000U)
-#define SYSTICK_RELOAD        ((SYSTEM_CLOCK_FREQ / SYSTICK_FREQ_HZ) - 1UL)
+#define SYSTEM_CLOCK_FREQ     48000000UL
+#define BUS_CLOCK_FREQ        24000000UL
 
-/* ---- Prototipos locales ---- */
+#define SYSTICK_INTERVAL_MS   1U
+#define SYSTICK_RELOAD        ((SYSTEM_CLOCK_FREQ / (SYSTICK_INTERVAL_MS * 1000U)) - 1UL)
+
 static void config_sys_clock(void);
 static void gpio_init(void);
 static void systick_config(void);
-static void uart0_init(void);
 
-/* ------------------------------------------------------------------
- * bsp_init()
- * Inicializa todos los periféricos del sistema.
- * ------------------------------------------------------------------ */
-void bsp_init(void)
-{
-    __disable_irq();        /* Deshabilitar interrupciones globales   */
+void bsp_init(void) {
+    __disable_irq();
 
-    config_sys_clock();     /* 1. Reloj del sistema a 48 MHz          */
-    gpio_init();            /* 2. LEDs RGB                            */
-    systick_config();       /* 3. Timer de base de tiempo (1 ms tick) */
-    uart0_init();           /* 4. UART0 a 9600 bps                    */
+    config_sys_clock();
+    gpio_init();
+    systick_config();
+    uart0_debug_init();    // <-- Ahora UART0 es la Terminal (115200 bps, PTA1/PTA2)
+    uart1_esp32_init();    // <-- Ahora UART1 es el ESP32 (9600 bps, PTE0/PTE1)
 
-    __enable_irq();         /* Habilitar interrupciones globales      */
+    __enable_irq();
 }
 
-/* ------------------------------------------------------------------
- * config_sys_clock()
- * Configura el FLL del MCG para generar 48 MHz.
- * ------------------------------------------------------------------ */
-static void config_sys_clock(void)
-{
-    /* Seleccionar PLL/FLL como fuente de reloj del sistema */
-    MCG->C1 |= MCG_C1_CLKS(0);
-
-    /* Usar reloj interno de referencia (IRC) como entrada del FLL */
-    MCG->C1 |= MCG_C1_IREFS(1);
-
-    /* Rango medio del DCO */
-    MCG->C4 |= MCG_C4_DRST_DRS(1);
-
-    /* DCO a 48 MHz (DMX32 = 1) */
-    MCG->C4 |= MCG_C4_DMX32(1);
+static void config_sys_clock(void) {
+    MCG->C1 |= MCG_C1_CLKS(0) | MCG_C1_IREFS(1);
+    MCG->C4 |= MCG_C4_DRST_DRS(1) | MCG_C4_DMX32(1);
 }
 
-/* ------------------------------------------------------------------
- * gpio_init()
- * Configura los pines del LED RGB (PTB18, PTB19, PTD1) como salidas.
- * ------------------------------------------------------------------ */
-static void gpio_init(void)
-{
-    SIM->SCGC5 |= SIM_SCGC5_PORTB(1);  /* Habilitar reloj PORTB */
-    SIM->SCGC5 |= SIM_SCGC5_PORTD(1);  /* Habilitar reloj PORTD */
-
-    PORTB->PCR[18] = PORT_PCR_MUX(1);  /* PTB18 como GPIO (LED Rojo)  */
-    PORTB->PCR[19] = PORT_PCR_MUX(1);  /* PTB19 como GPIO (LED Verde) */
-    PORTD->PCR[1]  = PORT_PCR_MUX(1);  /* PTD1  como GPIO (LED Azul)  */
-
-    GPIOB->PDDR |= (1U << 18) | (1U << 19);  /* PTB18, PTB19 como salidas */
-    GPIOD->PDDR |= (1U << 1);                 /* PTD1  como salida         */
-
+static void gpio_init(void) {
+    SIM->SCGC5 |= SIM_SCGC5_PORTB(1) | SIM_SCGC5_PORTD(1);
+    PORTB->PCR[18] = PORT_PCR_MUX(1);
+    PORTB->PCR[19] = PORT_PCR_MUX(1);
+    PORTD->PCR[1]  = PORT_PCR_MUX(1);
+    GPIOB->PDDR |= (1U << 18) | (1U << 19);
+    GPIOD->PDDR |= (1U << 1);
     GPIOB->PDOR |= (1U << 18) | (1U << 19);
     GPIOD->PDOR |= (1U << 1);
 }
 
-static void systick_config(void)
-{
+static void systick_config(void) {
     SysTick->LOAD = (uint32_t)SYSTICK_RELOAD;
     NVIC_SetPriority(SysTick_IRQn, (1UL << __NVIC_PRIO_BITS) - 1UL);
     SysTick->VAL  = 0UL;
-    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk |
-                    SysTick_CTRL_TICKINT_Msk    |
-                    SysTick_CTRL_ENABLE_Msk;
+    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_TICKINT_Msk | SysTick_CTRL_ENABLE_Msk;
 }
 
-/* ------------------------------------------------------------------
- * uart0_init()
- * Configura UART0 a 9600 bps, 8-N-1 con interrupción de recepción.
- *
- * Cálculo de baud rate:
- *   Baud = UART_CLK / ((OSR+1) * BR)
- *   9600 = 48_000_000 / (16 * BR)  →  BR = 312 = 0x138
- *   BDH = SBR[12:8] = 0x01
- *   BDL = SBR[7:0]  = 0x38
- * ------------------------------------------------------------------ */
-static void uart0_init(void)
-{
-    SIM->SOPT2 |= SIM_SOPT2_UART0SRC(1);
-
+/* --- UART0 PARA LA TERMINAL (115200 bps) --- */
+void uart0_debug_init(void) {
+    SIM->SOPT2 |= SIM_SOPT2_UART0SRC(1); // Reloj de 48 MHz
     SIM->SCGC4 |= SIM_SCGC4_UART0(1);
     SIM->SCGC5 |= SIM_SCGC5_PORTA(1);
 
-    PORTA->PCR[1] |= PORT_PCR_MUX(2);
-    PORTA->PCR[2] |= PORT_PCR_MUX(2);
+    PORTA->PCR[1] = PORT_PCR_MUX(2); // PTA1 -> RX
+    PORTA->PCR[2] = PORT_PCR_MUX(2); // PTA2 -> TX
 
     UART0->C2 &= ~(UART_C2_TE_MASK | UART_C2_RE_MASK);
 
-    UART0->BDH = 0x01;
-    UART0->BDL = 0x38;
-
+    // BR = 48MHz / (16 * 115200) = 26 = 0x1A
+    UART0->BDH = 0x00;
+    UART0->BDL = 0x1A;
     UART0->C1 = 0x00;
 
-    UART0->C2 = UART_C2_RIE(1) | UART_C2_TE(1) | UART_C2_RE(1);
+    // Solo habilitamos TX y RX, SIN interrupciones (Polling)
+    UART0->C2 = UART_C2_TE(1) | UART_C2_RE(1);
+}
 
-    NVIC_EnableIRQ(UART0_IRQn);
+/* --- UART1 PARA EL ESP32 (9600 bps) --- */
+void uart1_esp32_init(void) {
+    SIM->SCGC4 |= SIM_SCGC4_UART1(1);
+    SIM->SCGC5 |= SIM_SCGC5_PORTE(1);
+
+    PORTE->PCR[0] = PORT_PCR_MUX(3); // PTE0 -> TX
+    PORTE->PCR[1] = PORT_PCR_MUX(3); // PTE1 -> RX
+
+    UART1->C2 &= ~(UART_C2_TE_MASK | UART_C2_RE_MASK);
+
+    // Reloj Bus 24MHz. BR = 24MHz / (16 * 9600) = 156 = 0x9C
+    UART1->BDH = 0x00;
+    UART1->BDL = 0x9C;
+    UART1->C1 = 0x00;
+
+    // Habilitamos TX, RX y la Interrupción de Recepción (RIE)
+    UART1->C2 = UART_C2_RIE(1) | UART_C2_TE(1) | UART_C2_RE(1);
+    NVIC_EnableIRQ(UART1_IRQn);
+}
+
+/* --- RUTINAS DE ENVÍO PARA LA TERMINAL (UART0) --- */
+void uart0_send_byte(char c) {
+    while (!(UART0->S1 & UART_S1_TDRE_MASK));
+    UART0->D = (uint8_t)c;
+}
+
+void uart0_send_string(const char *s) {
+    while (*s) uart0_send_byte(*s++);
 }

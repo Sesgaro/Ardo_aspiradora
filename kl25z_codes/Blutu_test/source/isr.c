@@ -1,7 +1,7 @@
 /*
  * isr.c - Manejadores de interrupción
  * SysTick : incrementa g_ms_ticks y genera flags de 50/100/500 ms y 1 s
- * UART0   : captura byte recibido en user_input_key
+ * UART1   : captura byte recibido en user_input_key (ESP32)
  */
 
 #include "MKL25Z4.h"
@@ -62,14 +62,15 @@ void SysTick_Handler(void)
 }
 
 /* ------------------------------------------------------------------
- * UART0_IRQHandler()
- * Se ejecuta cuando llega un byte por UART0.
+ * UART1_IRQHandler() // <-- CORRECCIÓN: Cambiado de UART0 a UART1
+ * Se ejecuta cuando llega un byte por UART1 (ESP32).
  * Lee el dato del registro D y lo guarda en user_input_key.
  * ------------------------------------------------------------------ */
-void UART0_IRQHandler(void)
+void UART1_IRQHandler(void)
 {
-    if (UART0->S1 & UART_S1_RDRF_MASK)
+    // <-- CORRECCIÓN: Apuntando a los registros del UART1
+    if (UART1->S1 & UART_S1_RDRF_MASK)
     {
-        user_input_key = (char)UART0->D;
+        user_input_key = (char)UART1->D;
     }
 }

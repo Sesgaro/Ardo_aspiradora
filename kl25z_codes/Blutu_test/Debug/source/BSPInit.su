@@ -1,7 +1,10 @@
 /home/sesgaro/Ardo_aspiradora/kl25z_codes/Blutu_test/CMSIS/core_cm0plus.h:745:22:NVIC_EnableIRQ	16	static
 /home/sesgaro/Ardo_aspiradora/kl25z_codes/Blutu_test/CMSIS/core_cm0plus.h:804:22:NVIC_SetPriority	24	static
-../source/BSPInit.c:31:6:bsp_init	8	static
-../source/BSPInit.c:47:13:config_sys_clock	8	static
-../source/BSPInit.c:66:13:gpio_init	8	static
-../source/BSPInit.c:87:13:systick_config	8	static
-../source/BSPInit.c:107:13:uart0_init	8	static
+../source/BSPInit.c:15:6:bsp_init	8	static
+../source/BSPInit.c:27:13:config_sys_clock	8	static
+../source/BSPInit.c:32:13:gpio_init	8	static
+../source/BSPInit.c:43:13:systick_config	8	static
+../source/BSPInit.c:51:6:uart0_debug_init	8	static
+../source/BSPInit.c:71:6:uart1_esp32_init	8	static
+../source/BSPInit.c:91:6:uart0_send_byte	16	static
+../source/BSPInit.c:96:6:uart0_send_string	16	static
