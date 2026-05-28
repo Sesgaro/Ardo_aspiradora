@@ -4,29 +4,28 @@
 #include <stdint.h>
 
 /*
- * ultrasonico.h
- * -------------
- * Módulo para sensor ultrasónico HC-SR04 en la KL25Z.
+ * ultrasonico.h  –  HC-SR04 no bloqueante (state machine + TPM0 input capture)
  *
- * Pines usados:
- *   PTA12  →  TRIG  (salida)
- *   PTD4   →  ECHO  (entrada)
+ * Pines:
+ *   PTA12  →  TRIG  (salida GPIO,      ALT1)
+ *   PTD4   →  ECHO  (TPM0_CH4 capture, ALT4)
  *
  * Timer:
- *   TPM0 con prescaler 1:32 sobre el bus clock (20.97 MHz aprox.)
- *   Factor de conversión: ticks × 0.02617 = distancia en cm
+ *   TPM0 libre, prescaler 1:32, MCGFLLCLK 48 MHz → 1.5 MHz
+ *   Factor: ticks × 0.01143 = distancia en cm
  *
- * Uso:
- *   1. Llamar ultrasonico_init() una sola vez en bsp_init() o en main().
- *   2. Llamar ultrasonico_medir() para obtener la distancia en cm.
+ * Uso (desde main loop):
+ *   1. ultrasonico_init()        — una sola vez al arrancar
+ *   2. ultrasonico_tick()        — llamar cada iteración del loop principal
+ *   3. ultrasonico_start()       — solicitar nueva medición (típico: cada 500 ms)
+ *   4. ultrasonico_is_ready()    — true cuando hay resultado disponible
+ *   5. ultrasonico_get_result()  — retorna cm, o -1.0f si timeout/error
  */
 
-/* Inicializa GPIO y TPM0 para el sensor ultrasónico.
- * Llama a esta función antes de usar ultrasonico_medir(). */
-void ultrasonico_init(void);
-
-/* Dispara una medición y retorna la distancia en centímetros.
- * Bloquea ~25 ms máximo (tiempo de vuelo + pulso de trigger). */
-float ultrasonico_medir(void);
+void  ultrasonico_init(void);
+void  ultrasonico_start(void);
+void  ultrasonico_tick(void);
+uint8_t ultrasonico_is_ready(void);
+float ultrasonico_get_result(void);
 
 #endif /* _ULTRASONICO_H_ */

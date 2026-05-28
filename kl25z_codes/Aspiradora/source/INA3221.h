@@ -3,18 +3,21 @@
 
 #include <stdint.h>
 
-// Dirección I2C del sensor
-#define INA3221_ADDR          0x40
+/* Dirección I2C (A0=GND, A1=GND) */
+#define INA3221_ADDR                0x40U
 
-// Registros de los 3 Canales
-#define INA3221_REG_SHUNTVOLTAGE_1 0x01
-#define INA3221_REG_BUSVOLTAGE_1   0x02
-#define INA3221_REG_SHUNTVOLTAGE_2 0x03
-#define INA3221_REG_BUSVOLTAGE_2   0x04
-#define INA3221_REG_SHUNTVOLTAGE_3 0x05
-#define INA3221_REG_BUSVOLTAGE_3   0x06
+/* Registros */
+#define INA3221_REG_CONFIG          0x00U
+#define INA3221_REG_SHUNTVOLTAGE_1  0x01U
+#define INA3221_REG_BUSVOLTAGE_1    0x02U
+#define INA3221_REG_SHUNTVOLTAGE_2  0x03U
+#define INA3221_REG_BUSVOLTAGE_2    0x04U
+#define INA3221_REG_SHUNTVOLTAGE_3  0x05U
+#define INA3221_REG_BUSVOLTAGE_3    0x06U
 
-// Estructura para almacenar los datos limpios de un canal
+/* Config: CH1+CH2+CH3 habilitados, AVG=1, VBUS_CT=1.1ms, VSH_CT=1.1ms, Continuo */
+#define INA3221_CONFIG_DEFAULT      0x7127U
+
 typedef struct {
     int32_t bus_mV;
     int32_t shunt_uV;

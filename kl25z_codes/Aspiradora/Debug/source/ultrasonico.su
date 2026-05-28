@@ -1,3 +1,3 @@
-../source/ultrasonico.c:24:13:delay_us_tpm0	24	static
-../source/ultrasonico.c:33:6:ultrasonico_init	8	static
-../source/ultrasonico.c:55:7:ultrasonico_medir	16	static
+../source/ultrasonico.c:33:13:delay_us_tpm0	24	static
+../source/ultrasonico.c:42:6:ultrasonico_init	8	static
+../source/ultrasonico.c:72:7:ultrasonico_medir	16	static
