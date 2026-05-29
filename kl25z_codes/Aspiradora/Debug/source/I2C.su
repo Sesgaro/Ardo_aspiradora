@@ -1,2 +1,0 @@
-../source/I2C.c:5:6:I2C1_init	8	static
-../source/I2C.c:19:5:I2C1_burstRead	32	static
