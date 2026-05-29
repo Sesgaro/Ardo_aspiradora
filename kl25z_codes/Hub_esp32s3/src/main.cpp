@@ -28,6 +28,12 @@
 #include "host/ble_gap.h"
 #include "host/ble_gatt.h"
 
+/* ─── MODO DE PRUEBA ─────────────────────────────────────────────────────── */
+/* WIFI_ENABLED 0 → aislar BLE: sin WiFi/MQTT, solo conexión + notificaciones
+ * BLE con el C3 (para confirmar si el problema es coexistencia WiFi+BLE).
+ * Volver a 1 para operación normal. */
+#define WIFI_ENABLED 0
+
 /* ─── CREDENCIALES ───────────────────────────────────────────────────────── */
 #define WIFI_SSID    "Ardo"
 #define WIFI_PASS    "ardi2siempre"
@@ -51,17 +57,25 @@ static EventGroupHandle_t       s_eg;
 
 static esp_mqtt_client_handle_t mqtt_client      = NULL;
 static volatile bool            ble_is_synced    = false;
-static volatile bool            mqtt_connected   = false;
 static volatile bool            is_scanning      = false;
-static volatile bool            wifi_up          = false;
+#if WIFI_ENABLED
 static volatile bool            s_mqtt_started   = false;
+static volatile bool            mqtt_connected   = false;
+static volatile bool            wifi_up          = false;
+#else
+/* Modo BLE-only: fingimos red lista para que el escaneo BLE no espere. */
+static volatile bool            mqtt_connected   = true;
+static volatile bool            wifi_up          = true;
+#endif
 static uint16_t                 g_conn_handle    = BLE_HS_CONN_HANDLE_NONE;
 static uint16_t                 g_rx_char_handle = 0;
-static TimerHandle_t            s_reconnect_timer  = NULL;
 static TimerHandle_t            s_ble_retry_timer  = NULL;
+#if WIFI_ENABLED
+static TimerHandle_t            s_reconnect_timer  = NULL;
 static TaskHandle_t             s_wifi_task      = NULL;
 static volatile int             s_consec_fails   = 0;
 static uint32_t                 s_retry_delay    = 1000;
+#endif
 static int32_t                  g_battery_level  = -1;
 static char                     g_vac_state[16]  = "docked";
 
@@ -89,6 +103,13 @@ void        nimble_host_task(void *param);
  * HELPERS: MQTT STATE + DISCOVERY
  * ========================================================================= */
 
+/* Wrapper seguro: si MQTT no está iniciado (modo BLE-only), es un no-op. */
+static int mqtt_pub(esp_mqtt_client_handle_t c, const char *topic,
+                    const char *data, int len, int qos, int retain) {
+    if (c == NULL) return -1;
+    return esp_mqtt_client_publish(c, topic, data, len, qos, retain);
+}
+
 static void publish_vac_state(void) {
     char buf[64];
     if (g_battery_level >= 0) {
@@ -98,9 +119,10 @@ static void publish_vac_state(void) {
         snprintf(buf, sizeof(buf), "{\"state\":\"%s\"}", g_vac_state);
     }
     /* retain=1: HA recuerda el último estado tras reinicio */
-    esp_mqtt_client_publish(mqtt_client, TOPIC_VAC_STATE, buf, 0, 1, 1);
+    mqtt_pub(mqtt_client, TOPIC_VAC_STATE, buf, 0, 1, 1);
 }
 
+#if WIFI_ENABLED
 /* Registra la entidad vacuum en Home Assistant via MQTT Discovery */
 static void publish_discovery(void) {
     const char *payload =
@@ -119,13 +141,14 @@ static void publish_discovery(void) {
             "\"manufacturer\":\"Ardo\""
           "}"
         "}";
-    esp_mqtt_client_publish(mqtt_client, TOPIC_DISCOVERY, payload, 0, 1, 1);
+    mqtt_pub(mqtt_client, TOPIC_DISCOVERY, payload, 0, 1, 1);
     /* Disponibilidad inicial: hub online, esperando conexión BLE */
-    esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS, "Aspiradora Desconectada", 0, 1, 1);
+    mqtt_pub(mqtt_client, TOPIC_STATUS, "Aspiradora Desconectada", 0, 1, 1);
     /* Estado inicial retenido para que HA muestre algo inmediatamente */
-    esp_mqtt_client_publish(mqtt_client, TOPIC_VAC_STATE, "{\"state\":\"docked\"}", 0, 1, 1);
+    mqtt_pub(mqtt_client, TOPIC_VAC_STATE, "{\"state\":\"docked\"}", 0, 1, 1);
     ESP_LOGI(TAG, "MQTT Discovery publicado.");
 }
+#endif /* WIFI_ENABLED */
 
 /* =========================================================================
  * BLE WRITE — envío de comandos a la aspiradora
@@ -159,6 +182,7 @@ static void ble_write_cmd(const char *cmd) {
 /* =========================================================================
  * WI-FI
  * ========================================================================= */
+#if WIFI_ENABLED
 
 static void wifi_do_connect(void) {
     esp_wifi_connect();
@@ -251,7 +275,7 @@ static void mqtt_event_handler(void *arg, esp_event_base_t base,
         mqtt_connected = true;
         publish_discovery();
         esp_mqtt_client_subscribe(mqtt_client, TOPIC_VAC_CMD, 1);
-        esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS,
+        mqtt_pub(mqtt_client, TOPIC_STATUS,
                                 "Buscando Aspiradora...", 0, 1, 1);
         if (ble_is_synced && !is_scanning) ble_app_scan();
         break;
@@ -299,6 +323,8 @@ static void mqtt_event_handler(void *arg, esp_event_base_t base,
     }
 }
 
+#endif /* WIFI_ENABLED */
+
 /* =========================================================================
  * BLE
  * ========================================================================= */
@@ -328,7 +354,7 @@ static void parse_and_publish(const char *buf) {
 
     } else if (strncmp(buf, "ALERTA:", 7) == 0) {
         ESP_LOGI(TAG, "Alerta: %s", buf + 7);
-        esp_mqtt_client_publish(mqtt_client, TOPIC_ALERT, buf + 7, 0, 1, 0);
+        mqtt_pub(mqtt_client, TOPIC_ALERT, buf + 7, 0, 1, 0);
 
     } else {
         ESP_LOGI(TAG, "MSG: %s", buf);
@@ -342,7 +368,7 @@ static int ble_on_subscribe(uint16_t conn_handle,
     if (error->status == 0) {
         ESP_LOGI(TAG, ">>> SUSCRITO a notificaciones TX (handle=%d). OK <<<",
                  attr ? attr->handle : 0);
-        esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS,
+        mqtt_pub(mqtt_client, TOPIC_STATUS,
                                 "Aspiradora Conectada", 0, 1, 1);
     } else {
         ESP_LOGE(TAG, ">>> ERROR al suscribir CCCD: status=%d <<<", error->status);
@@ -424,8 +450,16 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg) {
             is_scanning      = false;
             strncpy(g_vac_state, "idle", sizeof(g_vac_state) - 1);
             publish_vac_state();
-            ESP_LOGI(TAG, "BLE conectado (handle=%d). Descubriendo servicios...",
+            ESP_LOGI(TAG, "BLE conectado (handle=%d). Negociando MTU...",
                      g_conn_handle);
+            /* Intercambio de MTU: el móvil (que SÍ recibe notificaciones) lo
+             * hace al conectar. Algunos stacks no entregan bien las notifys
+             * espontáneas hasta que se negocia el MTU. Lo hacemos antes del
+             * descubrimiento para replicar ese comportamiento. */
+            int mtu_rc = ble_gattc_exchange_mtu(g_conn_handle, NULL, NULL);
+            if (mtu_rc != 0)
+                ESP_LOGW(TAG, "ble_gattc_exchange_mtu error: %d", mtu_rc);
+            ESP_LOGI(TAG, "Descubriendo servicios...");
             ble_gattc_disc_all_svcs(g_conn_handle, ble_on_disc_svc, NULL);
         } else {
             ESP_LOGW(TAG, "Conexión BLE falló (status=%d). Reintentando scan...",
@@ -442,7 +476,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg) {
         is_scanning      = false;
         strncpy(g_vac_state, "docked", sizeof(g_vac_state) - 1);
         ESP_LOGW(TAG, "BLE desconectado.");
-        esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS,
+        mqtt_pub(mqtt_client, TOPIC_STATUS,
                                 "Aspiradora Desconectada", 0, 1, 1);
         if (mqtt_connected && wifi_up) ble_app_scan();
         break;
@@ -454,6 +488,11 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg) {
          * dejaría la radio escaneando mientras conecta y mataría las
          * notificaciones. */
         is_scanning = false;
+        break;
+
+    case BLE_GAP_EVENT_MTU:
+        ESP_LOGI(TAG, "MTU negociado: %d (conn=%d)",
+                 event->mtu.value, event->mtu.conn_handle);
         break;
 
     case BLE_GAP_EVENT_NOTIFY_RX: {
@@ -469,6 +508,11 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg) {
     }
 
     default:
+        /* DIAGNÓSTICO: loguear cualquier evento GAP no manejado. Si tras
+         * suscribirnos aparecen eventos aquí (p.ej. un NOTIFY_RX con un valor
+         * de enum distinto al esperado), lo veremos; si no aparece NADA es que
+         * no llega ningún connection event a este callback. */
+        ESP_LOGW(TAG, "GAP event no manejado: type=%d", event->type);
         break;
     }
     return 0;
@@ -533,6 +577,7 @@ extern "C" void app_main(void) {
 
     s_eg = xEventGroupCreate();
 
+#if WIFI_ENABLED
     esp_netif_create_default_wifi_sta();
     wifi_init_config_t wcfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&wcfg));
@@ -596,6 +641,16 @@ extern "C" void app_main(void) {
                         pdFALSE, pdTRUE, portMAX_DELAY);
 
     ESP_LOGI(TAG, "IP obtenida. Iniciando BLE...");
+#else
+    /* ─── Modo BLE-only ──────────────────────────────────────────────────
+     * Sin WiFi/MQTT: no se inicializa la radio WiFi ni el cliente MQTT.
+     * mqtt_client queda NULL (mqtt_pub es no-op) y wifi_up/mqtt_connected
+     * están fijados en true para que el escaneo BLE arranque sin esperar red.
+     * Así aislamos la comunicación BLE con el C3 sin coexistencia. */
+    ESP_LOGW(TAG, "*** MODO BLE-ONLY: WiFi/MQTT deshabilitados ***");
+    ESP_LOGI(TAG, "Iniciando BLE...");
+#endif
+
     nimble_port_init();
     ble_hs_cfg.sync_cb = ble_app_on_sync;
     nimble_port_freertos_init(nimble_host_task);
