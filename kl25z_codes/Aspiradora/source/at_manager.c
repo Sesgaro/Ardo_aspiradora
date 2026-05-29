@@ -158,6 +158,18 @@ void at_manager_tick(void)
     }
 }
 
+uint8_t at_wait_init(void)
+{
+    while (result.state == AT_WAITING) {
+        at_manager_tick();
+    }
+    if (result.state == AT_DONE) {
+        at_clear();
+        return 1U;
+    }
+    return 0U;
+}
+
 const at_result_t *at_get_result(void) { return &result; }
 
 void at_clear(void)

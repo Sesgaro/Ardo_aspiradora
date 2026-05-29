@@ -10,6 +10,12 @@ static uint16_t INA3221_ReadRegister(uint8_t reg) {
     return 0xFFFFU;
 }
 
+uint8_t INA3221_check(void)
+{
+    uint16_t id = INA3221_ReadRegister(INA3221_REG_MANUFACTURER_ID);
+    return (id == 0x5449U) ? 1U : 0U;
+}
+
 void INA3221_init(void) {
     /* Escribe la configuración por defecto para verificar comunicación y
      * dejar el sensor en estado conocido (reemplaza el power-on reset). */

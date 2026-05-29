@@ -17,6 +17,7 @@
 
 /* Config: CH1+CH2+CH3 habilitados, AVG=1, VBUS_CT=1.1ms, VSH_CT=1.1ms, Continuo */
 #define INA3221_CONFIG_DEFAULT      0x7127U
+#define INA3221_REG_MANUFACTURER_ID 0xFEU   /* siempre lee 0x5449 ("TI") */
 
 typedef struct {
     int32_t bus_mV;
@@ -24,7 +25,8 @@ typedef struct {
     int32_t current_mA;
 } INA_Data_t;
 
-void INA3221_init(void);
-void INA3221_read_channel(uint8_t channel, INA_Data_t *data);
+uint8_t INA3221_check(void);        /* 1 = detectado, 0 = ausente/error */
+void    INA3221_init(void);
+void    INA3221_read_channel(uint8_t channel, INA_Data_t *data);
 
 #endif /* _INA3221_H_ */

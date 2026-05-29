@@ -38,6 +38,7 @@ typedef struct {
 } at_result_t;
 
 void                at_manager_init(void);
+uint8_t             at_wait_init(void);     /* bloquea hasta resolver el AT de startup; 1=OK, 0=timeout */
 void                at_manager_tick(void);
 void                at_send_command(const char *cmd);
 const at_result_t  *at_get_result(void);

@@ -12,8 +12,8 @@ CONFIG_BT_NIMBLE_ROLE_OBSERVER=y
 CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
 CONFIG_BT_NIMBLE_ROLE_BROADCASTER=n
 
-# Máximo 1 conexión simultánea (ahorra RAM)
-CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+# Máximo 2 conexiones simultáneas (Hub ESP32-S3 + celular)
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=2
 
 # ── Log ───────────────────────────────────────────────────────────────────
 CONFIG_LOG_DEFAULT_LEVEL_INFO=y
